@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>猜數字 1A2B</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--fg:#1f2328;--mut:#6b7280;--line:#e2e0d9;--acc:#2f6fed;--ok:#1a7f45;--err:#c62828;--warn:#b26a00;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--card:#1f2226;--fg:#e8eaed;--mut:#9aa0a6;--line:#31353a;--acc:#6b9cff;--ok:#5ad08a;--err:#ff7b7b;--warn:#f0b050;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15171a;--card:#1f2226;--fg:#e8eaed;--mut:#9aa0a6;--line:#31353a;--acc:#6b9cff;--ok:#5ad08a;--err:#ff7b7b;--warn:#f0b050;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;display:flex;justify-content:center;padding:20px 14px}
+main{width:100%;max-width:480px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+h1{margin:0 0 4px;font-size:22px}
+h2{margin:18px 0 8px;font-size:15px;color:var(--mut);font-weight:600}
+p.sub{margin:0 0 16px;color:var(--mut);font-size:14px;line-height:1.5}
+.row{display:flex;gap:8px}
+input[type=text]{flex:1;min-width:0;font-size:24px;letter-spacing:.35em;text-align:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-variant-numeric:tabular-nums}
+input[type=text]:disabled{opacity:.5}
+button{font:inherit;padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+#msg{min-height:1.5em;margin:10px 0;font-size:14px}
+#msg.err{color:var(--err)}#msg.ok{color:var(--ok);font-weight:600}
+.bar{display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px;font-size:14px;color:var(--mut);gap:8px;flex-wrap:wrap}
+label{display:flex;align-items:center;gap:6px;cursor:pointer}
+#dbg{padding:8px 12px;border:1px dashed var(--line);border-radius:10px;font-size:14px;margin-bottom:8px}
+#dbg b{letter-spacing:.2em;font-variant-numeric:tabular-nums}
+#ro{padding:8px 12px;border-radius:10px;background:var(--bg);font-size:13px;color:var(--mut);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+#ro button{padding:4px 10px;font-size:13px}
+.meta{font-size:13px;color:var(--mut);margin-bottom:6px;line-height:1.6}
+.hist{max-height:260px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:7px 4px;text-align:center;border-bottom:1px solid var(--line);font-size:15px}
+th{color:var(--mut);font-weight:500;font-size:13px}
+td.g{letter-spacing:.2em}td.t{font-size:13px;color:var(--mut)}
+tr.win td{color:var(--ok);font-weight:600}
+.empty{color:var(--mut);text-align:center;padding:14px;font-size:14px}
+#games{list-style:none;margin:0;padding:0;max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:10px}
+#games li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+#games li:last-child{border-bottom:0}
+#games li.sel{background:var(--bg);box-shadow:inset 3px 0 0 var(--acc)}
+#games .sm{color:var(--mut);font-size:12px}
+.badge{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.b-playing{color:var(--acc)}.b-done{color:var(--ok)}.b-abandoned{color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <h1>猜數字 1A2B</h1>
+  <p class="sub">答案為 0～9 中四個不重複的數字，可由 0 開頭。A＝數字與位置都對，B＝數字對但位置不同。紀錄只存在目前頁面，重新整理後會清空。</p>
+
+  <div class="row">
+    <input id="in" type="text" inputmode="numeric" autocomplete="off" placeholder="0123" aria-label="輸入四位數字">
+    <button id="go" class="p">猜</button>
+  </div>
+  <div id="msg" role="status" aria-live="polite"></div>
+
+  <div class="bar">
+    <label><input type="checkbox" id="dbgToggle"> 除錯模式</label>
+    <button id="new">新的一局</button>
+  </div>
+  <div id="dbg" hidden>目前答案：<b id="ans"></b></div>
+  <div id="ro" hidden><span id="roTxt"></span><button id="back">回到進行中的局</button></div>
+
+  <div class="meta" id="meta"></div>
+  <div class="hist">
+    <table>
+      <thead><tr><th>次序</th><th>猜測</th><th>結果</th><th>時間</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty">尚無猜測</div>
+  </div>
+
+  <h2>所有局數（點選查看）</h2>
+  <ul id="games"></ul>
+</main>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var inp=$('in'),go=$('go'),msg=$('msg'),rows=$('rows'),empty=$('empty'),meta=$('meta'),
+      dbgBox=$('dbg'),ans=$('ans'),tog=$('dbgToggle'),ro=$('ro'),roTxt=$('roTxt'),list=$('games');
+  var games=[],seq=0,viewId=null;
+  var LABEL={playing:'進行中',done:'已完成',abandoned:'未完成'};
+
+  function pad(n){return n<10?'0'+n:''+n}
+  function fmt(t){var d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())}
+  function draw(){
+    var d=[0,1,2,3,4,5,6,7,8,9];
+    for(var i=9;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=d[i];d[i]=d[j];d[j]=t}
+    return d.slice(0,4).join('');
+  }
+  function score(g,a){
+    var A=0,B=0;
+    for(var i=0;i<4;i++){if(g[i]===a[i])A++;else if(a.indexOf(g[i])!==-1)B++}
+    return [A,B];
+  }
+  function validate(s){
+    if(s==='')return '請輸入四位數字。';
+    if(!/^[0-9]+$/.test(s))return '只能輸入數字 0～9，不可含空白或其他字元。';
+    if(s.length!==4)return '必須是四位數字（目前 '+s.length+' 位），請補足或修正。';
+    if(new Set(s.split('')).size!==4)return '數字不可重複，請修正。';
+    return '';
+  }
+  function setMsg(t,c){msg.textContent=t;msg.className=c||''}
+  function byId(id){for(var i=0;i<games.length;i++)if(games[i].id===id)return games[i];return null}
+  function current(){var g=games[games.length-1];return g&&g.status==='playing'?g:null}
+
+  function renderDebug(g){
+    var show=g.status==='done'||tog.checked;   // 完成可顯示解答；其餘僅除錯模式顯示
+    dbgBox.hidden=!show;
+    dbgBox.firstChild.textContent=g.status==='done'?'本局解答：':'本局答案：';
+    ans.textContent=g.answer;
+  }
+  function render(){
+    var g=byId(viewId),cur=current(),editable=g===cur;
+    inp.disabled=!editable;go.disabled=!editable;
+    renderDebug(g);
+    ro.hidden=editable;
+    if(!editable){
+      roTxt.textContent='第 '+g.no+' 局為唯讀（'+LABEL[g.status]+'），僅供查看。';
+      $('back').hidden=!cur;
+    }
+    meta.textContent='第 '+g.no+' 局 · '+LABEL[g.status]+' · 開始 '+fmt(g.startedAt)+
+      (g.endedAt?' · 結束 '+fmt(g.endedAt):'')+' · 共 '+g.guesses.length+' 次';
+    rows.textContent='';
+    g.guesses.forEach(function(h){
+      var tr=document.createElement('tr');if(h.A===4)tr.className='win';
+      [String(h.n),h.g,h.A+'A'+h.B+'B',fmt(h.at)].forEach(function(t,k){
+        var td=document.createElement('td');td.textContent=t;
+        if(k===1)td.className='g';if(k===3)td.className='t';tr.appendChild(td);
+      });
+      rows.appendChild(tr);
+    });
+    empty.hidden=g.guesses.length>0;
+    var box=document.querySelector('.hist');box.scrollTop=box.scrollHeight;
+
+    list.textContent='';
+    games.slice().reverse().forEach(function(x){
+      var li=document.createElement('li');if(x.id===viewId)li.className='sel';
+      var l=document.createElement('div');
+      var t=document.createElement('div');t.textContent='第 '+x.no+' 局';
+      var s=document.createElement('div');s.className='sm';s.textContent=fmt(x.startedAt)+' 開始 · '+x.guesses.length+' 次猜測';
+      l.appendChild(t);l.appendChild(s);
+      var b=document.createElement('span');b.className='badge b-'+x.status;b.textContent=LABEL[x.status];
+      li.appendChild(l);li.appendChild(b);
+      li.addEventListener('click',function(){view(x.id)});
+      list.appendChild(li);
+    });
+  }
+  function view(id){
+    if(id===viewId)return;
+    viewId=id;tog.checked=false;setMsg('');   // 切換到另一局：除錯顯示預設關閉
+    render();
+    if(current()&&id===current().id)inp.focus();
+  }
+  function newGame(){
+    var cur=current();
+    if(cur){cur.status='abandoned';cur.endedAt=Date.now()}  // 中途換局：保留並標示未完成
+    var g={id:++seq,no:seq,answer:draw(),status:'playing',startedAt:Date.now(),endedAt:null,guesses:[]};
+    games.push(g);viewId=g.id;
+    tog.checked=false;inp.value='';setMsg('');
+    render();inp.focus();
+  }
+  function submit(){
+    var g=current();
+    if(!g||viewId!==g.id)return;
+    var s=inp.value;
+    var e=validate(s);
+    if(e){setMsg(e,'err');return}
+    var r=score(s,g.answer);
+    g.guesses.push({n:g.guesses.length+1,g:s,A:r[0],B:r[1],at:Date.now()});
+    inp.value='';
+    if(r[0]===4){
+      g.status='done';g.endedAt=Date.now();
+      setMsg('🎉 4A0B！第 '+g.no+' 局完成，共猜了 '+g.guesses.length+' 次。','ok');
+    }else setMsg(s+'：'+r[0]+'A'+r[1]+'B');
+    render();
+    if(g.status==='playing')inp.focus();
+  }
+  go.addEventListener('click',submit);
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();submit()}});
+  $('new').addEventListener('click',newGame);
+  $('back').addEventListener('click',function(){var c=current();if(c)view(c.id)});
+  tog.addEventListener('change',function(){renderDebug(byId(viewId))}); // 只切換顯示
+  newGame();
+})();
+</script>
+</body>
+</html>
